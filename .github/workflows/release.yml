@@ -12,7 +12,8 @@ concurrency:
 env:
   SERVICE_NAME: analytics
   DOCKERHUB_REPO: ${{ vars.DOCKERHUB_ORG }}/${{ github.event.repository.name }}
-  CACHE_CONFIG: type=s3,region=${{ vars.AWS_CACHE_REGION }},bucket=${{ vars.AWS_CACHE_BUCKET }},access_key_id=${{ secrets.AWS_CACHE_ACCESS_KEY_ID }},secret_access_key=${{ secrets.AWS_CACHE_SECRET_ACCESS_KEY }}
+  DOCKERHUB_MIGRATIONS_REPO: ${{ vars.DOCKERHUB_ORG }}/${{ github.event.repository.name }}-migrations
+  CACHE_CONFIG: type=s3,region=${{ vars.AWS_REGION }},bucket=${{ vars.AWS_BUCKET }},access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }},secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
 
 jobs:
@@ -46,19 +47,33 @@ jobs:
       -
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-region: ${{ vars.AWS_CACHE_REGION }}
-          aws-access-key-id: ${{ secrets.AWS_CACHE_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_CACHE_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       -
         name: Build and push ${{ github.event.repository.name }}
         uses: docker/build-push-action@v3
         with:
           context: .
           file: ./Dockerfile
+          target: ${{ github.event.repository.name }}
           push: true
           provenance: false
           platforms: linux/${{ matrix.arch }}
           tags: ${{ vars.DOCKERHUB_ORG }}/${{ github.event.repository.name }}:latest-${{ matrix.arch }}
+          cache-from: ${{ env.CACHE_CONFIG }},prefix=buildx/${{ github.event.repository.name }}/${{ matrix.arch }}/
+          cache-to: ${{ env.CACHE_CONFIG }},prefix=buildx/${{ github.event.repository.name }}/${{ matrix.arch }}/,mode=max
+      -
+        name: Build and push ${{ github.event.repository.name }}-migrations
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: ./Dockerfile
+          target: migrator
+          push: true
+          provenance: false
+          platforms: linux/${{ matrix.arch }}
+          tags: ${{ vars.DOCKERHUB_ORG }}/${{ github.event.repository.name }}-migrations:latest-${{ matrix.arch }}
           cache-from: ${{ env.CACHE_CONFIG }},prefix=buildx/${{ github.event.repository.name }}/${{ matrix.arch }}/
           cache-to: ${{ env.CACHE_CONFIG }},prefix=buildx/${{ github.event.repository.name }}/${{ matrix.arch }}/,mode=max
 
@@ -80,13 +95,20 @@ jobs:
           images: ${{ env.DOCKERHUB_REPO }}:latest-amd64,${{ env.DOCKERHUB_REPO }}:latest-arm64
           push: true
 
+      - name: Merge migrations image tags
+        uses: Noelware/docker-manifest-action@master
+        with:
+          inputs: ${{ env.DOCKERHUB_MIGRATIONS_REPO }}:latest,${{ env.DOCKERHUB_MIGRATIONS_REPO }}:${{ github.sha }}
+          images: ${{ env.DOCKERHUB_MIGRATIONS_REPO }}:latest-amd64,${{ env.DOCKERHUB_MIGRATIONS_REPO }}:latest-arm64
+          push: true
+
       - name: Setup variables
         id: vars
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/release" ]]; then
-            echo "::set-output name=environment::prod"
+            echo "environment=prod" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=environment::stage"
+            echo "environment=stage" >> $GITHUB_OUTPUT
           fi
 
       - name: Invoke workflow in hub-kubes repo
