@@ -1,12 +1,3 @@
-# hub-rust-boilerplate
-Template rust service repository for the Holaplex Hub
+# hub-analytics
 
-# Workspaces
-
-```
-/api # API server
-/core # shared dependencies such as queries and mutations
-/entity # application database models and graphql objects
-/migration # database migrations
-/src # app entry point
-```
+Holaplex Hub event consumer to build analytics

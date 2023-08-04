@@ -1,0 +1,36 @@
+[package]
+name = "holaplex-hub-analytics"
+version = "0.1.0"
+authors = ["Holaplex <engineering@holaplex.com>"]
+edition = "2021"
+description = "Holaplex Hub analytics service"
+readme = "./README.md"
+repository = "https://github.com/holaplex/hub-analytics"
+license = "AGPL-3.0-or-later"
+keywords = ["hub", "holaplex", "web3"]
+categories = ["cryptography::cryptocurrencies", "web-programming"]
+
+build = "build.rs"
+
+[dependencies]
+sea-orm = { version = "^0.10.0", features = [
+  "debug-print",
+  "runtime-tokio-rustls",
+  "sqlx-postgres",
+] }
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = { version = "1.0.91" }
+prost = "0.11.6"
+
+[dependencies.hub-core]
+package = "holaplex-hub-core"
+version = "0.3.1"
+git = "https://github.com/holaplex/hub-core"
+branch = "stable"
+features = ["kafka"]
+
+[build-dependencies.hub-core-build]
+package = "holaplex-hub-core-build"
+version = "0.2.1"
+git = "https://github.com/holaplex/hub-core"
+branch = "stable"

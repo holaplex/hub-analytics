@@ -1,0 +1,39 @@
+[[schemas]]
+subject = "credential"
+version = 2
+sha512 = "0e01b47d7892ee2c5d7b21e5f7da6bb196404d5e5beeb8ac5c14100736d12252988df47a8924f7e3edf7205755423553f2c561623ff3644989a3f1450a798909"
+
+[[schemas]]
+subject = "customer"
+version = 2
+sha512 = "d75800df0d4744c6b0f4d9a9952d3bfd0bb6b24a8babd19104cc11b54a525f85551b3c7375d69aeabbcf629cd826aa0bc6b0c0467add20716c504f5e856ce1c5"
+
+[[schemas]]
+subject = "nfts"
+version = 22
+sha512 = "c9920f6a5792b067396c88e40b9bd2adfcb55b582734aff924a67a9d5841a5e2839fc734c1bbff66f402f9a9d8852ca5fef1339aaaa3d5b05aa7868ddfa375c1"
+
+[[schemas]]
+subject = "organization"
+version = 5
+sha512 = "9fb28ac73d9712292297394a5fa53a7dae9deba6847353582987ba749859301c23c05fd49d2ce84a1640f8864c5c04d59fa38907700b280000e5c4afc96654bf"
+
+[[schemas]]
+subject = "polygon_nfts"
+version = 3
+sha512 = "370089156e7e7c9538f6d5f66f3f53feb03423a99fd5386794c573a57538cefe8d59203ddd82be383d32d19f00dede702d58fc4b92ccb27f5eccb5808be7c5c6"
+
+[[schemas]]
+subject = "solana_nfts"
+version = 7
+sha512 = "73570b9e58f91a06901ba6455986ce1a0d3675e33860d2447160d711a8cebcfb78cfc714fb08644ad83495dc8612b0b123203561af6d93d29ffb0256725047ba"
+
+[[schemas]]
+subject = "treasury"
+version = 16
+sha512 = "bf8ad07bb11acefeaced6e5da417a9b49bad3770e4dd7f3d29b743fb943da973ab8587f7fef10a40a76b2e477d1c3956410de8403b7fb6efa80b95f2c3b8e8cf"
+
+[[schemas]]
+subject = "webhook"
+version = 2
+sha512 = "a8b98ccc3a1cfd1f5346e2552e428e596ffaf83d5ef657e903b4487b66762b54759200e54bb1b5935bea00906173eac83b7528948db9ea16314cc345104807c1"
