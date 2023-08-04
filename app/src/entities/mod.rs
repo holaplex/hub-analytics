@@ -4,7 +4,6 @@ pub mod prelude;
 
 pub mod collections;
 pub mod customers;
-pub mod drops;
 pub mod mints;
 pub mod organizations;
 pub mod projects;
