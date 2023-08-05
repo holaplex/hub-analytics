@@ -16,6 +16,20 @@ jobs:
   test:
     name: Cargo Test
     runs-on: amd64
+
+    services:
+      postgres:
+        image: postgres:14.1
+
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: ci
+
+        ports:
+          - 5432:5432
+
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
@@ -41,9 +55,9 @@ jobs:
 
       - uses: tespkg/actions-cache@v1
         with:
-          accessKey: ${{ secrets.AWS_CACHE_ACCESS_KEY_ID }}
-          secretKey: ${{ secrets.AWS_CACHE_SECRET_ACCESS_KEY }}
-          bucket: ${{ vars.AWS_CACHE_BUCKET }}
+          accessKey: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          secretKey: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          bucket: ${{ vars.AWS_BUCKET }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
@@ -54,5 +68,7 @@ jobs:
 
       - name: cargo test
         uses: actions-rs/cargo@v1
+        env:
+          DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci
         with:
           command: test
