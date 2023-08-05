@@ -1,7 +1,9 @@
 use sea_orm_migration::prelude::*;
 
-use crate::m20230804_212530_create_projects_table::Projects;
-use crate::m20230804_213809_create_collections_table::Collections;
+use crate::{
+    m20230804_212530_create_projects_table::Projects,
+    m20230804_213809_create_collections_table::Collections,
+};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
