@@ -47,6 +47,9 @@ CMD ["cargo", "watch", "-x", "run --bin holaplex-hub-analytics"]
 FROM builder AS builder-hub-analytics
 RUN cargo build --release --bin holaplex-hub-analytics
 
+FROM builder AS builder-migration
+RUN cargo build --release --bin migration
+
 FROM debian:bookworm-slim as base
 WORKDIR /app
 RUN apt-get update -y && \
