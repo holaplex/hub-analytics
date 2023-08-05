@@ -22,6 +22,7 @@ FROM chef AS planner
 
 COPY Cargo.* ./
 COPY app app
+COPY migration migration
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
@@ -31,6 +32,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # Build application
 COPY Cargo.* ./
 COPY app app
+COPY migration migration
 
 FROM chef as development
 COPY --from=planner /app/recipe.json recipe.json
@@ -51,10 +53,25 @@ RUN apt-get update -y && \
   apt-get install -y --no-install-recommends \
     ca-certificates \
     libpq5 \
-    libssl1.1 \
+    libssl-dev \
   && \
   rm -rf /var/lib/apt/lists/*
 
 FROM base AS hub-analytics
+ENV TZ=Etc/UTC
+ENV APP_USER=runner
+
+RUN groupadd $APP_USER \
+    && useradd --uid 10000 -g $APP_USER $APP_USER \
+    && mkdir -p bin
+
+RUN chown -R $APP_USER:$APP_USER bin
+
+USER 10000
+
 COPY --from=builder-hub-analytics /app/target/release/holaplex-hub-analytics /usr/local/bin
 CMD ["/usr/local/bin/holaplex-hub-analytics"]
+
+FROM base AS migrator
+COPY --from=builder-migration /app/target/release/migration /usr/local/bin
+CMD ["/usr/local/bin/migration"]
