@@ -8,7 +8,7 @@ use hub_core::{
 
 pub fn main() {
     let opts = hub_core::StartConfig {
-        service_name: "hub-orgs",
+        service_name: "hub-analytics",
     };
 
     hub_core::run(opts, |common, args| {
