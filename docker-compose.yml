@@ -22,7 +22,7 @@ services:
     env_file:
       - .env
     ports:
-      - 5440:5432
+      - 5437:5432
     volumes:
       - holaplex_hub_analytics:/var/lib/postgresql/data
 
