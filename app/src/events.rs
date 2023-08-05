@@ -14,7 +14,6 @@ use crate::{
 /// This function fails if ...
 #[allow(clippy::too_many_lines)]
 pub async fn process(msg: Services, db: Connection) -> Result<()> {
-    // match topics
     match msg {
         Services::Organizations(k, v) => match v.event {
             Some(organization_events::Event::OrganizationCreated(v)) => {
@@ -57,7 +56,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                 wallets::ActiveModel {
                     id: Set(Uuid::parse_str(&k.id)?),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
-                    customer_id: Set(Uuid::parse_str(&v.customer_id)?),
+                    blockchain: Set(int_to_blockchain(v.blockchain)),
                     timestamp: Set(Utc::now().naive_utc()),
                 }
                 .insert(db.get())
@@ -131,4 +130,14 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
             Some(_) | None => Ok(()),
         },
     }
+}
+
+fn int_to_blockchain(n: i32) -> String {
+    match n {
+        1 => "Solana",
+        2 => "Polygon",
+        3 => "Ethereum",
+        _ => "Unspecified",
+    }
+    .to_string()
 }
