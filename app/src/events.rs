@@ -7,6 +7,7 @@ use crate::{
     proto::{customer_events, nft_events, organization_events, solana_nft_events, treasury_events},
     Services,
 };
+
 /// Res
 ///
 /// # Errors
@@ -42,7 +43,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                 customers::ActiveModel {
                     id: Set(Uuid::parse_str(&k.id)?),
                     project_id: Set(Uuid::parse_str(&v.project_id)?),
-                    ts: Set(Utc::now().naive_utc()),
+                    timestamp: Set(Utc::now().naive_utc()),
                 }
                 .insert(db.get())
                 .await?;
@@ -57,7 +58,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                     id: Set(Uuid::parse_str(&k.id)?),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
                     customer_id: Set(Uuid::parse_str(&v.customer_id)?),
-                    ts: Set(Utc::now().naive_utc()),
+                    timestamp: Set(Utc::now().naive_utc()),
                 }
                 .insert(db.get())
                 .await?;
@@ -72,7 +73,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                     name: Set(v.master_edition.unwrap_or_default().name),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
                     blockchain: Set("Solana".to_string()),
-                    ts: Set(Utc::now().naive_utc()),
+                    timestamp: Set(Utc::now().naive_utc()),
                 }
                 .insert(db.get())
                 .await?;
@@ -84,7 +85,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                     name: Set(v.edition_info.unwrap_or_default().collection),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
                     blockchain: Set("Polygon".to_string()),
-                    ts: Set(Utc::now().naive_utc()),
+                    timestamp: Set(Utc::now().naive_utc()),
                 }
                 .insert(db.get())
                 .await?;
@@ -95,7 +96,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                     id: Set(Uuid::parse_str(&k.id)?),
                     collection_id: Set(Uuid::parse_str(&v.drop_id)?),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
-                    ts: Set(Utc::now().naive_utc()),
+                    timestamp: Set(Utc::now().naive_utc()),
                 }
                 .insert(db.get())
                 .await?;
@@ -110,7 +111,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                     name: Set(v.metadata.unwrap_or_default().name),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
                     blockchain: Set("Solana".to_string()),
-                    ts: Set(Utc::now().naive_utc()),
+                    timestamp: Set(Utc::now().naive_utc()),
                 }
                 .insert(db.get())
                 .await?;
@@ -121,7 +122,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                     id: Set(Uuid::parse_str(&k.id)?),
                     collection_id: Set(Uuid::parse_str(&v.collection_id)?),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
-                    ts: Set(Utc::now().naive_utc()),
+                    timestamp: Set(Utc::now().naive_utc()),
                 }
                 .insert(db.get())
                 .await?;

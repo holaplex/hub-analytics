@@ -12,7 +12,7 @@ pub struct Model {
     pub project_id: Uuid,
     #[sea_orm(column_type = "Text")]
     pub blockchain: String,
-    pub ts: DateTime,
+    pub timestamp: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
