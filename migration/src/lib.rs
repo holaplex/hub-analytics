@@ -5,6 +5,7 @@ mod m20230804_212530_create_projects_table;
 mod m20230804_212603_create_customers_table;
 mod m20230804_213809_create_collections_table;
 mod m20230804_214701_create_mints_table;
+mod m20230805_140311_create_wallets_table;
 
 pub struct Migrator;
 
@@ -17,6 +18,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230804_212603_create_customers_table::Migration),
             Box::new(m20230804_213809_create_collections_table::Migration),
             Box::new(m20230804_214701_create_mints_table::Migration),
+            Box::new(m20230805_140311_create_wallets_table::Migration),
         ]
     }
 }
