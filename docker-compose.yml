@@ -17,6 +17,7 @@ services:
       - 9092:9092
       - 9644:9644
       - 29092:29092
+
   db:
     image: postgres:15.2
     env_file:
@@ -25,6 +26,25 @@ services:
       - 5437:5432
     volumes:
       - holaplex_hub_analytics:/var/lib/postgresql/data
+
+  cube:
+    container_name: "cube"
+    restart: "always"
+    image: cubejs/cube
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_API_SECRET=SECRET
+      - CUBEJS_DEV_MODE=true
+      - CUBEJS_DATASOURCES=default
+      - CUBEJS_DB_TYPE=postgres
+      - CUBEJS_DB_HOST=db
+      - CUBEJS_DB_USER=postgres
+      - CUBEJS_DB_NAME=analytics
+      - CUBEJS_DB_PASS=holaplex
+
+    volumes:
+      - .:/cube/conf
 
 volumes:
   holaplex_hub_analytics:
