@@ -14,7 +14,7 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Collections::Table)
+                    .table(Mints::Table)
                     .if_not_exists()
                     .col(ColumnDef::new(Mints::Id).uuid().not_null().primary_key())
                     .col(ColumnDef::new(Mints::CollectionId).uuid().not_null())
