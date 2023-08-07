@@ -43,18 +43,19 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 IndexCreateStatement::new()
-                    .name("mints_collection_id_idx")
-                    .table(Collections::Table)
-                    .col(Collections::ProjectId)
-                    .index_type(IndexType::Hash)
-                    .to_owned(),
+            .name("mints_collection_id_idx")
+            .table(Mints::Table)
+            .col(Mints::CollectionId)
+            .index_type(IndexType::Hash)
+            .if_not_exists() // Adding this line to conditionally create the index
+            .to_owned(),
             )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Collections::Table).to_owned())
+            .drop_table(Table::drop().table(Mints::Table).to_owned())
             .await
     }
 }
