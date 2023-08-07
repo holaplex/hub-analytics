@@ -8,6 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
     pub project_id: Uuid,
+    pub owner: String,
     pub collection_id: Uuid,
     pub timestamp: DateTime,
 }

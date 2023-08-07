@@ -17,6 +17,7 @@ impl MigrationTrait for Migration {
                     .table(Mints::Table)
                     .if_not_exists()
                     .col(ColumnDef::new(Mints::Id).uuid().not_null().primary_key())
+                    .col(ColumnDef::new(Mints::Owner).string().not_null())
                     .col(ColumnDef::new(Mints::CollectionId).uuid().not_null())
                     .foreign_key(
                         ForeignKey::create()
@@ -65,6 +66,7 @@ enum Mints {
     Table,
     Id,
     CollectionId,
+    Owner,
     ProjectId,
     Timestamp,
 }
