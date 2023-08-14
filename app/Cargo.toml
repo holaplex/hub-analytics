@@ -32,7 +32,7 @@ serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.91" }
 serde-aux = "4.2.0"
 prost = "0.11.6"
-cube-client = { version = "0.1.1", path = "/Users/mpw/projects/cube-client"}
+cube-client = { git = "https://github.com/holaplex/cube-client", branch = "main" }
 
 [dependencies.hub-core]
 package = "holaplex-hub-core"
