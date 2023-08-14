@@ -18,9 +18,21 @@ sea-orm = { version = "^0.10.0", features = [
   "runtime-tokio-rustls",
   "sqlx-postgres",
 ] }
+poem = { version = "1.3.50", features = ["anyhow", "test", "cookie"] }
+async-graphql = { version = "5.0.4", features = [
+  "chrono",
+  "uuid",
+  "log",
+  "dataloader",
+  "apollo_tracing",
+] }
+async-graphql-poem = "5.0.3"
+async-std = { version = "^1", features = ["attributes", "tokio1"] }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.91" }
+serde-aux = "4.2.0"
 prost = "0.11.6"
+cube-client = { version = "0.1.1", path = "/Users/mpw/projects/cube-client"}
 
 [dependencies.hub-core]
 package = "holaplex-hub-core"

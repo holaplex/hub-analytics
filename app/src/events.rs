@@ -94,7 +94,6 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                 mints::ActiveModel {
                     id: Set(Uuid::parse_str(&k.id)?),
                     collection_id: Set(Uuid::parse_str(&v.collection_id)?),
-                    owner: Set(v.recipient_address),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
                     timestamp: Set(Utc::now().naive_utc()),
                 }
@@ -106,7 +105,6 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                 mints::ActiveModel {
                     id: Set(Uuid::parse_str(&k.id)?),
                     collection_id: Set(Uuid::parse_str(&v.collection_id)?),
-                    owner: Set(v.receiver),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
                     timestamp: Set(Utc::now().naive_utc()),
                 }
@@ -132,7 +130,6 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
             Some(solana_nft_events::Event::ImportedExternalMint(v)) => {
                 mints::ActiveModel {
                     id: Set(Uuid::parse_str(&k.id)?),
-                    owner: Set(v.owner),
                     collection_id: Set(Uuid::parse_str(&v.collection_id)?),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
                     timestamp: Set(Utc::now().naive_utc()),

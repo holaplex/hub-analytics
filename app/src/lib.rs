@@ -2,11 +2,16 @@
 #![warn(clippy::pedantic, clippy::cargo)]
 #![allow(clippy::module_name_repetitions)]
 
+pub mod cube_client;
 pub mod db;
+#[allow(clippy::pedantic)]
 pub mod entities;
 pub mod events;
-use hub_core::{clap, consumer::RecvError, prelude::*};
-
+pub mod graphql;
+pub mod handlers;
+use db::Connection;
+use hub_core::{clap, consumer::RecvError, prelude::*, uuid::Uuid};
+use poem::{async_trait, FromRequest, Request, RequestBody};
 #[allow(clippy::pedantic)]
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/organization.proto.rs"));
@@ -83,6 +88,71 @@ impl hub_core::consumer::MessageGroup for Services {
 #[derive(Debug, clap::Args)]
 #[command(version, author, about)]
 pub struct Args {
+    #[arg(short, long, env, default_value_t = 3008)]
+    pub port: u16,
+
     #[command(flatten)]
     pub db: db::DbArgs,
+
+    #[command(flatten)]
+    pub cube: cube_client::CubeArgs,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct UserID(Option<Uuid>);
+
+impl TryFrom<&str> for UserID {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        let id = Uuid::from_str(value)?;
+
+        Ok(Self(Some(id)))
+    }
+}
+
+#[async_trait]
+impl<'a> FromRequest<'a> for UserID {
+    async fn from_request(req: &'a Request, _body: &mut RequestBody) -> poem::Result<Self> {
+        let id = req
+            .headers()
+            .get("X-USER-ID")
+            .and_then(|value| value.to_str().ok())
+            .map_or(Ok(Self(None)), Self::try_from)?;
+
+        Ok(id)
+    }
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    pub schema: graphql::schema::AppSchema,
+    pub connection: Connection,
+    pub cube: cube_client::Client,
+}
+
+impl AppState {
+    #[must_use]
+    pub fn new(
+        schema: graphql::schema::AppSchema,
+        connection: Connection,
+        cube: cube_client::Client,
+    ) -> Self {
+        Self {
+            schema,
+            connection,
+            cube,
+        }
+    }
+}
+
+pub struct AppContext {
+    pub user_id: Option<Uuid>,
+}
+
+impl AppContext {
+    #[must_use]
+    pub fn new(user_id: Option<Uuid>) -> Self {
+        Self { user_id }
+    }
 }
