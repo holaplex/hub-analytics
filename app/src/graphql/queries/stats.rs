@@ -1,132 +1,16 @@
-use std::fmt;
-
-use async_graphql::{Context, Enum, InputObject, Object, Result};
-use cube_client::models::{
-    V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension, V1LoadResponse,
-};
-use hub_core::{chrono::NaiveDate, uuid::Uuid};
+use async_graphql::{Context, Object, Result};
+use hub_core::uuid::Uuid;
 
 use crate::{
     cube_client::{Client, Query as CubeQuery, TimeGranularity},
-    graphql::objects::DataPoint,
+    graphql::objects::{
+        DataPoint, DataPoints, DateRange, Granularity, Measure, Order,
+        V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+    },
 };
 
 #[derive(Debug, Clone, Default)]
 pub struct Query;
-
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum Granularity {
-    Hour,
-    Day,
-    Week,
-    Month,
-    Year,
-}
-
-#[derive(InputObject)]
-pub struct Measure {
-    resource: Resource,
-    operation: Operation,
-}
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum Operation {
-    Count,
-    Change,
-}
-
-impl fmt::Display for Operation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Operation::Count => "count",
-            Operation::Change => "change",
-        };
-        write!(f, "{s}")
-    }
-}
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum Resource {
-    Mints,
-    Customers,
-    Wallets,
-    Collections,
-    Projects,
-    Organizations,
-}
-
-impl fmt::Display for Resource {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Resource::Mints => "mints",
-            Resource::Customers => "customers",
-            Resource::Wallets => "wallets",
-            Resource::Collections => "collections",
-            Resource::Projects => "projects",
-            Resource::Organizations => "organizations",
-        };
-        write!(f, "{s}")
-    }
-}
-
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum Order {
-    Asc,
-    Desc,
-}
-
-impl fmt::Display for Order {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Order::Asc => "asc",
-            Order::Desc => "desc",
-        };
-        write!(f, "{s}")
-    }
-}
-
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum Dimension {
-    Collections,
-    Projects,
-    Organizations,
-}
-
-impl fmt::Display for Dimension {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Dimension::Collections => "collections",
-            Dimension::Projects => "projects",
-            Dimension::Organizations => "organizations",
-        };
-        write!(f, "{s}")
-    }
-}
-
-#[derive(InputObject)]
-pub struct DateRange {
-    pub start_date: NaiveDate,
-    pub end_date: NaiveDate,
-}
-
-impl From<DateRange> for Vec<String> {
-    fn from(date_range: DateRange) -> Self {
-        vec![
-            date_range.start_date.format("%Y-%m-%d").to_string(),
-            date_range.end_date.format("%Y-%m-%d").to_string(),
-        ]
-    }
-}
-
-impl From<Granularity> for TimeGranularity {
-    fn from(input: Granularity) -> Self {
-        match input {
-            Granularity::Hour => TimeGranularity::Hour,
-            Granularity::Day => TimeGranularity::Day,
-            Granularity::Week => TimeGranularity::Week,
-            Granularity::Month => TimeGranularity::Month,
-            Granularity::Year => TimeGranularity::Year,
-        }
-    }
-}
 
 #[Object(name = "StatQuery")]
 impl Query {
@@ -157,11 +41,15 @@ impl Query {
     ) -> Result<Vec<DataPoint>> {
         let cube_client = ctx.data::<Client>()?;
 
+        let target_resource = measures.as_ref().and_then(|ms| ms.first()).map_or_else(
+            || "mints".to_string(),
+            |measure| measure.resource.to_string(),
+        );
         let time_dimension = {
             let granularity = granularity.map(|g| TimeGranularity::from(g).to_string());
 
             V1LoadRequestQueryTimeDimension {
-                dimension: "mints.timestamp".to_string(),
+                dimension: format!("{target_resource}.timestamp"),
                 granularity,
                 date_range: date_range.map(|dr| (dr.start_date, dr.end_date)), /* Convert DateRangeInput to tuple */
             }
@@ -174,48 +62,30 @@ impl Query {
             .iter()
             .map(|measure| format!("{}.{}", measure.resource, measure.operation))
             .collect();
-        let dimension_by = match (organization_id, project_id, collection_id) {
+
+        let dimension = match (organization_id, project_id, collection_id) {
             (Some(_), None, None) => "organization_id",
             (None, Some(_), Some(_)) => "project_id",
             _ => "collection_id",
         };
 
         let filter = V1LoadRequestQueryFilterItem::equals_member(
-            &format!("mints.{dimension_by}"),
+            &format!("{target_resource}.{dimension}",),
             collection_id.unwrap(),
         );
 
         let query = CubeQuery::new()
             .limit(limit.unwrap_or(100))
-            .order("mints.timestamp", &order)
+            .order(&format!("{target_resource}.timestamp"), &order)
             .measures(measures)
-            .dimensions(vec![&format!("mints.{dimension_by}")])
+            .dimensions(vec![&format!("{target_resource}.{dimension}")])
             .time_dimensions(time_dimension)
             .filter_member(filter);
+
         hub_core::tracing::info!("Query: {:#?}", query);
 
         let response = cube_client.execute_query(query).await?;
-
-        let data_points = parse_data_points(&response)?;
+        let data_points: Vec<DataPoint> = DataPoints::try_from(response)?.into_vec();
         Ok(data_points)
     }
-}
-
-fn parse_data_points(response: &str) -> Result<Vec<DataPoint>> {
-    let response_data: V1LoadResponse =
-        serde_json::from_str(response).map_err(|e| async_graphql::Error::new(e.to_string()))?;
-
-    let data: &Vec<serde_json::Value> = response_data
-        .results
-        .first()
-        .ok_or_else(|| async_graphql::Error::new("No results found"))?
-        .data
-        .as_ref();
-
-    let data_points: Result<Vec<DataPoint>, _> = data
-        .iter()
-        .map(|d| serde_json::from_value(d.clone()))
-        .collect();
-
-    data_points.map_err(|e| async_graphql::Error::new(e.to_string()))
 }
