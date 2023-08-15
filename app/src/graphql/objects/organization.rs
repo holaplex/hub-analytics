@@ -9,6 +9,7 @@ use crate::graphql::{
 #[derive(Debug, Clone, SimpleObject)]
 #[graphql(complex)]
 pub struct Organization {
+    #[graphql(external)]
     pub id: Uuid,
 }
 

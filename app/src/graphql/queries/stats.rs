@@ -46,7 +46,7 @@ impl Query {
     ) -> Result<Vec<DataPoint>> {
         let cube_client = ctx.data::<Client>()?;
 
-        let target_resource = measures.as_ref().and_then(|ms| ms.first()).map_or_else(
+        let resource = measures.as_ref().and_then(|ms| ms.first()).map_or_else(
             || "mints".to_string(),
             |measure| measure.resource.to_string(),
         );
@@ -54,7 +54,7 @@ impl Query {
             let granularity = granularity.map(|g| TimeGranularity::from(g).to_string());
 
             V1LoadRequestQueryTimeDimension {
-                dimension: format!("{target_resource}.timestamp"),
+                dimension: format!("{resource}.timestamp"),
                 granularity,
                 date_range: date_range.map(|dr| (dr.start_date, dr.end_date)),
             }
@@ -75,15 +75,15 @@ impl Query {
         };
 
         let filter = V1LoadRequestQueryFilterItem::equals_member(
-            &format!("{target_resource}.{dimension}",),
+            &format!("{resource}.{dimension}",),
             collection_id.unwrap(),
         );
 
         let query = CubeQuery::new()
             .limit(limit.unwrap_or(100))
-            .order(&format!("{target_resource}.timestamp"), &order)
+            .order(&format!("{resource}.timestamp"), &order)
             .measures(measures)
-            .dimensions(vec![&format!("{target_resource}.{dimension}")])
+            .dimensions(vec![&format!("{resource}.{dimension}")])
             .time_dimensions(time_dimension)
             .filter_member(filter);
 
