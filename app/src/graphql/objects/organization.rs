@@ -8,13 +8,12 @@ use crate::graphql::{
 
 #[derive(Debug, Clone, SimpleObject)]
 #[graphql(complex)]
-pub struct Collection {
+pub struct Organization {
     pub id: Uuid,
 }
 
 #[ComplexObject]
-impl Collection {
-    #[allow(clippy::too_many_arguments)]
+impl Organization {
     async fn stats(
         &self,
         ctx: &Context<'_>,
@@ -27,9 +26,9 @@ impl Collection {
         stats::Query::stats(
             &stats::Query,
             ctx,
-            None,
-            None,
             Some(self.id),
+            None,
+            None,
             measures,
             granularity,
             date_range,

@@ -1,5 +1,7 @@
 mod collection;
 mod datapoint;
+mod organization;
+mod project;
 
 pub use collection::Collection;
 pub use cube_client::models::{
@@ -9,3 +11,5 @@ pub use datapoint::{
     DataPoint, DataPoints, DateRange, Dimension, Granularity, Measure, Operation, Order, Resource,
     TimeGranularity,
 };
+pub use organization::Organization;
+pub use project::Project;

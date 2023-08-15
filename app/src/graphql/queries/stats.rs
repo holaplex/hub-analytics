@@ -17,8 +17,13 @@ impl Query {
     /// Returns a list of data points for a specific collection and timeframe.
     ///
     /// # Arguments
-    /// * `collection_id` - The ID of the collection.
+    /// * `organizationId` - The ID of the organization
+    /// * `projectId` - The ID of the project.
+    /// * `collectionId` - The ID of the collection.
+    /// * `measures` - An map array of resources to query (resource, operation).
     /// * `granularity` - The time granularity for grouping (e.g., Day, Week, Month, Year).
+    /// * `dateRange` - DateFrom and DateTo, in YYYY-MM-DD format.
+    /// * `order` - order the results by ASC or DESC.
     /// * `limit` - Optional limit on the number of data points to retrieve.
     ///
     /// # Returns
@@ -27,7 +32,7 @@ impl Query {
     /// # Errors
     /// This function returns an error if there was a problem with retrieving the data points.
     #[allow(clippy::too_many_arguments)]
-    async fn stats(
+    pub async fn stats(
         &self,
         ctx: &Context<'_>,
         organization_id: Option<Uuid>,
@@ -51,7 +56,7 @@ impl Query {
             V1LoadRequestQueryTimeDimension {
                 dimension: format!("{target_resource}.timestamp"),
                 granularity,
-                date_range: date_range.map(|dr| (dr.start_date, dr.end_date)), /* Convert DateRangeInput to tuple */
+                date_range: date_range.map(|dr| (dr.start_date, dr.end_date)),
             }
         };
         let order = order.unwrap_or(Order::Desc).to_string();
