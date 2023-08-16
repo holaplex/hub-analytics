@@ -1,4 +1,5 @@
 use holaplex_hub_analytics::{
+    cube_client::Client,
     db::Connection,
     events,
     graphql::schema::build_schema,
@@ -25,7 +26,7 @@ pub fn main() {
                 .context("failed to get database connection")?;
 
             let schema = build_schema();
-            let cube_client = cube.build_client();
+            let cube_client = Client::from_args(&cube)?;
             let state = AppState::new(schema, connection.clone(), cube_client.clone());
             let cons = common.consumer_cfg.build::<Services>().await?;
 

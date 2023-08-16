@@ -1,5 +1,3 @@
-use std::fmt;
-
 use async_graphql::{Enum, InputObject, SimpleObject};
 pub use cube_client::models::{v1_time::TimeGranularity, V1LoadResponse};
 use hub_core::{
@@ -8,27 +6,35 @@ use hub_core::{
     uuid::Uuid,
 };
 use serde::Deserialize;
-use serde_aux::prelude::*;
+use serde_json::Value;
+use std::{fmt, str::FromStr};
 
 /// A `DataPoint` object containing analytics information.
 #[derive(Debug, Clone, Deserialize, SimpleObject)]
 pub struct DataPoint {
-    /// Count of the metric.
-    #[serde(
-        rename = "mints.count",
-        deserialize_with = "deserialize_number_from_string"
-    )]
+    /// Analytics data for mints.
+    pub mints: Option<Data>,
+    /// Analytics data for customers.
+    pub customers: Option<Data>,
+    /// Analytics data for collections.
+    pub collections: Option<Data>,
+    /// Analytics data for wallets.
+    pub wallets: Option<Data>,
+    /// Analytics data for projects.
+    pub projects: Option<Data>,
+}
+
+#[derive(Debug, Clone, Deserialize, SimpleObject)]
+pub struct Data {
+    /// Count for the metric.
     pub count: u64,
     /// The ID of the organization the data belongs to.
     pub organization_id: Option<Uuid>,
     /// The ID of the collection the data belongs to.
-    #[serde(rename = "mints.collection_id")]
     pub collection_id: Option<Uuid>,
     /// The ID of the project the data belongs to.
-    #[serde(rename = "mints.project_id")]
     pub project_id: Option<Uuid>,
     /// The timestamp associated with the data point.
-    #[serde(rename = "mints.timestamp")]
     pub timestamp: Option<NaiveDateTime>,
 }
 
@@ -57,6 +63,21 @@ pub struct Measure {
     pub resource: Resource,
     pub operation: Operation,
 }
+
+impl Measure {
+    #[must_use]
+    pub fn new(resource: Resource, operation: Operation) -> Self {
+        Self {
+            resource,
+            operation,
+        }
+    }
+    #[must_use]
+    pub fn as_string(&self) -> String {
+        format!("{}.{}", self.resource, self.operation)
+    }
+}
+
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum Operation {
     Count,
@@ -79,7 +100,6 @@ pub enum Resource {
     Wallets,
     Collections,
     Projects,
-    Organizations,
 }
 
 impl fmt::Display for Resource {
@@ -90,9 +110,23 @@ impl fmt::Display for Resource {
             Resource::Wallets => "wallets",
             Resource::Collections => "collections",
             Resource::Projects => "projects",
-            Resource::Organizations => "organizations",
         };
         write!(f, "{s}")
+    }
+}
+
+impl FromStr for Resource {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "mints" => Ok(Resource::Mints),
+            "customers" => Ok(Resource::Customers),
+            "wallets" => Ok(Resource::Wallets),
+            "collections" => Ok(Resource::Collections),
+            "projects" => Ok(Resource::Projects),
+            _ => Err(()),
+        }
     }
 }
 
@@ -216,29 +250,71 @@ impl DataPoints {
         self.0
     }
 }
-impl TryFrom<String> for DataPoints {
-    type Error = hub_core::anyhow::Error;
+impl DataPoints {
+    /// Helper function to get a field and parse it as u64.
+    fn parse_count(value: &Value, resource: &str) -> Option<u64> {
+        value
+            .get(&format!("{resource}.count"))
+            .and_then(Value::as_str)
+            .and_then(|s| s.parse().ok())
+    }
 
-    fn try_from(response: String) -> Result<Self> {
-        let response_data: V1LoadResponse = serde_json::from_str(&response)
-            .map_err(|e| async_graphql::Error::new(e.to_string()))
-            .unwrap();
+    /// Helper function to get a field and parse it as Uuid.
+    fn parse_uuid(value: &Value, field: &str) -> Option<Uuid> {
+        value
+            .get(field)
+            .and_then(Value::as_str)
+            .and_then(|s| Uuid::parse_str(s).ok())
+    }
 
-        let data: Vec<serde_json::Value> = response_data
+    /// Helper function to get a field and parse it as `NaiveDateTime`.
+    fn parse_datetime(value: &Value, field: &str) -> Option<NaiveDateTime> {
+        value
+            .get(field)
+            .and_then(Value::as_str)
+            .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f").ok())
+    }
+
+    /// # Returns
+    /// a vector of datapoints parsed from the response coming from Cube API
+    ///
+    /// # Errors
+    /// This function returns an error if there was a problem with retrieving the data points.
+    pub fn from_response(
+        response: &str,
+        resource: &str,
+    ) -> Result<Vec<DataPoint>, async_graphql::Error> {
+        let response: V1LoadResponse =
+            serde_json::from_str(response).map_err(|e| async_graphql::Error::new(e.to_string()))?;
+
+        hub_core::tracing::info!("Res: {:#?}", response);
+        let data: Vec<Value> = response
             .results
             .first()
-            .ok_or_else(|| async_graphql::Error::new("No results found"))
-            .unwrap()
+            .ok_or_else(|| async_graphql::Error::new("No results found"))?
             .data
             .clone();
 
-        let data_points: Vec<DataPoint> = data
-            .into_iter()
-            .map(serde_json::from_value)
-            .collect::<Result<_, _>>()
-            .map_err(|e| async_graphql::Error::new(e.to_string()))
-            .unwrap();
+        data.into_iter()
+            .map(|v| {
+                Ok(DataPoint {
+                    mints: Self::parse_data(&v, resource),
+                    customers: Self::parse_data(&v, resource),
+                    wallets: Self::parse_data(&v, resource),
+                    collections: Self::parse_data(&v, resource),
+                    projects: Self::parse_data(&v, resource),
+                })
+            })
+            .collect()
+    }
 
-        Ok(DataPoints(data_points))
+    fn parse_data(value: &Value, resource: &str) -> Option<Data> {
+        Some(Data {
+            count: Self::parse_count(value, resource)?,
+            organization_id: Self::parse_uuid(value, "projects.organization_id"),
+            project_id: Self::parse_uuid(value, &format!("{resource}.project_id")),
+            collection_id: Self::parse_uuid(value, "mints.collection_id"),
+            timestamp: Self::parse_datetime(value, &format!("{resource}.timestamp")),
+        })
     }
 }

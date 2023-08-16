@@ -4,7 +4,11 @@ use cube_client::apis::{
 pub use cube_client::models::{
     v1_load_request::V1LoadRequest, v1_query::Query, v1_time::TimeGranularity,
 };
-use hub_core::{anyhow::Result, clap, thiserror};
+use hub_core::{
+    anyhow::{Context, Result},
+    clap, thiserror,
+    url::Url,
+};
 
 /// Arguments for establishing a database connection
 #[derive(Clone, Debug, clap::Args)]
@@ -14,21 +18,9 @@ pub struct CubeArgs {
     #[arg(long, env)]
     cube_auth_token: String,
 }
-impl CubeArgs {
-    /// Res
-    ///
-    /// # Errors
-    /// This function fails if ...
-    #[must_use]
-    pub fn build_client(&self) -> Client {
-        Client::new(self.clone())
-    }
-}
+
 #[derive(Clone, Debug)]
-pub struct Client {
-    cube_base_url: String,
-    auth_token: String,
-}
+pub struct Client(CubeConfig);
 
 #[derive(Debug, thiserror::Error)]
 pub enum CubeClientError {
@@ -39,26 +31,19 @@ pub enum CubeClientError {
 }
 
 impl Client {
-    #[must_use]
-    pub fn new(args: CubeArgs) -> Self {
-        let CubeArgs {
-            cube_base_url,
-            cube_auth_token,
-        } = args;
+    /// Res
+    /// Constructs a new `Client` instance from the provided arguments.
+    /// # Errors
+    /// This function fails if unable to parse Url from the provided arguments.
+    pub fn from_args(args: &CubeArgs) -> Result<Self> {
+        // It would be a good practice to validate the URL and maybe even normalize it.
+        let base_url = Url::parse(&args.cube_base_url).context("Invalid Cube base URL provided")?;
 
-        Self {
-            cube_base_url,
-            auth_token: cube_auth_token,
-        }
-    }
-
-    #[must_use]
-    pub fn get_client_config(&self) -> CubeConfig {
-        CubeConfig {
-            bearer_access_token: Some(self.auth_token.clone()),
-            base_path: self.cube_base_url.clone(),
+        Ok(Client(CubeConfig {
+            bearer_access_token: Some(args.cube_auth_token.clone()),
+            base_path: base_url.to_string(),
             ..Default::default()
-        }
+        }))
     }
     /// Res
     ///
@@ -70,7 +55,7 @@ impl Client {
             query_type: Some("multi".to_string()),
         };
 
-        let response = cube_api::load_v1(&self.get_client_config(), Some(request)).await?;
+        let response = cube_api::load_v1(&self.0, Some(request)).await?;
         Ok(serde_json::to_string(&response)?)
     }
 }

@@ -5,8 +5,9 @@ use hub_core::uuid::Uuid;
 use crate::{
     cube_client::{Client, Query as CubeQuery},
     graphql::objects::{
-        DataPoint, DataPoints, DateRange, Granularity, Measure, Order, TimeGranularity,
-        V1LoadRequestQueryFilterItem as Filter, V1LoadRequestQueryTimeDimension as TimeDimension,
+        DataPoint, DataPoints, DateRange, Granularity, Measure, Operation, Order, Resource,
+        TimeGranularity, V1LoadRequestQueryFilterItem as Filter,
+        V1LoadRequestQueryTimeDimension as TimeDimension,
     },
 };
 
@@ -38,27 +39,16 @@ impl Query {
         organization_id: Option<Uuid>,
         project_id: Option<Uuid>,
         collection_id: Option<Uuid>,
-        measures: Option<Vec<Measure>>,
         date_range: Option<DateRange>,
         order: Option<Order>,
         limit: Option<i32>,
     ) -> Result<Vec<DataPoint>> {
-        let cube_client = ctx.data::<Client>()?;
+        let cube = ctx.data::<Client>()?;
 
-        let resource = measures.as_ref().and_then(|ms| ms.first()).map_or_else(
-            || "mints".to_string(),
-            |measure| measure.resource.to_string(),
-        );
+        let (resource, dimensions, measures) = parse_dimensions_and_measures(ctx);
 
+        let measures = measures.iter().map(Measure::as_string).collect();
         let order = order.unwrap_or(Order::Desc).to_string();
-
-        let measures: Vec<String> = measures
-            .as_ref()
-            .unwrap_or(&Vec::new())
-            .iter()
-            .map(|measure| format!("{res}.{op}", res = measure.resource, op = measure.operation))
-            .collect();
-
         let (id, dimension) = get_id_and_dimension(organization_id, project_id, collection_id)?;
 
         let time_dimension = process_date_range(&resource, date_range)?;
@@ -72,14 +62,41 @@ impl Query {
             .limit(limit.unwrap_or(100))
             .order(&format!("{resource}.timestamp"), &order)
             .measures(measures)
-            .dimensions(vec![&format!("{resource}.{dimension}")])
+            .dimensions(dimensions)
             .time_dimensions(time_dimension)
             .filter_member(filter);
 
         hub_core::tracing::info!("Query: {:#?}", query);
-        let data_points = DataPoints::try_from(cube_client.query(query).await?)?.into_vec();
-        Ok(data_points)
+        hub_core::tracing::info!("Resource: {:#?}", resource);
+
+        DataPoints::from_response(&cube.query(query).await?, &resource)
     }
+}
+#[must_use]
+pub fn parse_dimensions_and_measures(ctx: &Context<'_>) -> (String, Vec<String>, Vec<Measure>) {
+    let mut dimensions = Vec::new();
+    let mut measures = Vec::new();
+
+    for field in ctx.field().selection_set() {
+        if let Ok(resource) = field.name().parse::<Resource>() {
+            for nested_field in field.selection_set() {
+                match nested_field.name() {
+                    "count" => measures.push(Measure::new(resource, Operation::Count)),
+                    "organizationId" => dimensions.push("projects.organization_id".to_string()),
+                    "projectId" => dimensions.push(format!("{resource}.project_id")),
+                    "collectionId" => dimensions.push(format!("{resource}.collection_id")),
+                    _ => {},
+                }
+            }
+        }
+    }
+
+    let resource = measures.first().map_or_else(
+        || "mints".to_string(),
+        |measure| measure.resource.to_string(),
+    );
+
+    (resource, dimensions, measures)
 }
 
 fn get_id_and_dimension(
