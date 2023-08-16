@@ -1,3 +1,5 @@
+use std::{fmt, str::FromStr};
+
 use async_graphql::{Enum, InputObject, SimpleObject};
 pub use cube_client::models::{v1_time::TimeGranularity, V1LoadResponse};
 use hub_core::{
@@ -7,7 +9,6 @@ use hub_core::{
 };
 use serde::Deserialize;
 use serde_json::Value;
-use std::{fmt, str::FromStr};
 
 /// A `DataPoint` object containing analytics information.
 #[derive(Debug, Clone, Deserialize, SimpleObject)]
