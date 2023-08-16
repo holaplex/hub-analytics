@@ -2,8 +2,8 @@ use async_graphql::{ComplexObject, Context, Result, SimpleObject};
 use hub_core::uuid::Uuid;
 
 use crate::graphql::{
-    objects::{DataPoint, DateRange, Granularity, Measure, Order},
-    queries::stats,
+    objects::{DataPoint, DateRange, Measure, Order},
+    queries::analytics::Query,
 };
 
 #[derive(Debug, Clone, SimpleObject)]
@@ -15,23 +15,21 @@ pub struct Organization {
 
 #[ComplexObject]
 impl Organization {
-    async fn stats(
+    async fn analytics(
         &self,
         ctx: &Context<'_>,
         measures: Option<Vec<Measure>>,
-        granularity: Option<Granularity>,
         date_range: Option<DateRange>,
         order: Option<Order>,
         limit: Option<i32>,
     ) -> Result<Vec<DataPoint>> {
-        stats::Query::stats(
-            &stats::Query,
+        Query::analytics(
+            &Query,
             ctx,
             Some(self.id),
             None,
             None,
             measures,
-            granularity,
             date_range,
             order,
             limit,

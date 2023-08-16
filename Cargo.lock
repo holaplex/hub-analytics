@@ -886,11 +886,11 @@ dependencies = [
 [[package]]
 name = "cube-client"
 version = "0.1.1"
-source = "git+https://github.com/holaplex/cube-client?branch=main#cd313ec5a78a34233f45e831c186ec659c4ffbd0"
 dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "either",
  "log",
  "reqwest",
  "reqwest-middleware",
@@ -1501,6 +1501,7 @@ dependencies = [
  "async-graphql-poem",
  "async-std",
  "cube-client",
+ "either",
  "holaplex-hub-core",
  "holaplex-hub-core-build",
  "poem",

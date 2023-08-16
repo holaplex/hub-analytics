@@ -19,7 +19,6 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Collections::Name).string().not_null())
                     .col(ColumnDef::new(Collections::ProjectId).uuid().not_null())
                     .foreign_key(
                         ForeignKey::create()
@@ -62,7 +61,6 @@ impl MigrationTrait for Migration {
 pub enum Collections {
     Table,
     Id,
-    Name,
     Blockchain,
     ProjectId,
     Timestamp,

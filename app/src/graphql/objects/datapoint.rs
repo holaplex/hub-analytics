@@ -41,6 +41,17 @@ pub enum Granularity {
     Year,
 }
 
+impl fmt::Display for Granularity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Granularity::Hour => "hour",
+            Granularity::Day => "day",
+            _ => "week",
+        };
+        write!(f, "{s}")
+    }
+}
+
 #[derive(InputObject)]
 pub struct Measure {
     pub resource: Resource,
@@ -121,15 +132,68 @@ impl fmt::Display for Dimension {
 
 #[derive(InputObject)]
 pub struct DateRange {
-    pub start_date: NaiveDate,
-    pub end_date: NaiveDate,
+    pub start: Option<NaiveDate>,
+    pub end: Option<NaiveDate>,
+    pub interval: Option<Interval>,
 }
 
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum Interval {
+    All,
+    Today,
+    Yesterday,
+    ThisWeek,
+    ThisMonth,
+    ThisYear,
+    Last7Days,
+    Last30Days,
+    LastWeek,
+    LastMonth,
+    LastQuarter,
+    LastYear,
+}
+
+impl fmt::Display for Interval {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Interval::All => "all",
+            Interval::Today => "today",
+            Interval::Yesterday => "yesterday",
+            Interval::ThisWeek => "this week",
+            Interval::ThisMonth => "this month",
+            Interval::ThisYear => "this year",
+            Interval::Last7Days => "last 7 days",
+            Interval::Last30Days => "last 30 days",
+            Interval::LastWeek => "last week",
+            Interval::LastMonth => "last month",
+            Interval::LastQuarter => "last quarter",
+            Interval::LastYear => "last year",
+        };
+        write!(f, "{s}")
+    }
+}
+impl Interval {
+    #[must_use]
+    pub fn to_granularity(&self) -> Granularity {
+        match self {
+            Interval::Today | Interval::Yesterday => Granularity::Hour,
+            Interval::ThisWeek
+            | Interval::All
+            | Interval::Last7Days
+            | Interval::LastWeek
+            | Interval::ThisMonth
+            | Interval::Last30Days
+            | Interval::LastMonth => Granularity::Day,
+            Interval::LastQuarter => Granularity::Week,
+            Interval::ThisYear | Interval::LastYear => Granularity::Month,
+        }
+    }
+}
 impl From<DateRange> for Vec<String> {
     fn from(date_range: DateRange) -> Self {
         vec![
-            date_range.start_date.format("%Y-%m-%d").to_string(),
-            date_range.end_date.format("%Y-%m-%d").to_string(),
+            date_range.start.unwrap().format("%Y-%m-%d").to_string(),
+            date_range.end.unwrap().format("%Y-%m-%d").to_string(),
         ]
     }
 }
@@ -137,11 +201,10 @@ impl From<DateRange> for Vec<String> {
 impl From<Granularity> for TimeGranularity {
     fn from(input: Granularity) -> Self {
         match input {
-            Granularity::Hour => TimeGranularity::Hour,
-            Granularity::Day => TimeGranularity::Day,
-            Granularity::Week => TimeGranularity::Week,
-            Granularity::Month => TimeGranularity::Month,
-            Granularity::Year => TimeGranularity::Year,
+            Granularity::Hour => TimeGranularity::Minute,
+            Granularity::Day => TimeGranularity::Hour,
+            Granularity::Week | Granularity::Month => TimeGranularity::Day,
+            Granularity::Year => TimeGranularity::Month,
         }
     }
 }

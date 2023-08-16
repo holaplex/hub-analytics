@@ -64,13 +64,13 @@ impl Client {
     ///
     /// # Errors
     /// This function fails if query parameters are invalid or Cube is not responding
-    pub async fn execute_query(&self, query_builder: Query) -> Result<String, CubeClientError> {
+    pub async fn query(&self, query: Query) -> Result<String, CubeClientError> {
         let request = V1LoadRequest {
-            query: Some(query_builder.build()),
+            query: Some(query.build()),
             query_type: Some("multi".to_string()),
         };
 
         let response = cube_api::load_v1(&self.get_client_config(), Some(request)).await?;
-        Ok(serde_json::to_string_pretty(&response)?)
+        Ok(serde_json::to_string(&response)?)
     }
 }
