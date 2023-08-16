@@ -1,3 +1,9 @@
+use std::collections::HashSet;
+
+use async_graphql::{Context, Object, Result};
+use either::Either;
+use hub_core::uuid::Uuid;
+
 use crate::{
     cube_client::{Client, Query as CubeQuery},
     graphql::objects::{
@@ -6,10 +12,6 @@ use crate::{
         V1LoadRequestQueryTimeDimension as TimeDimension,
     },
 };
-use async_graphql::{Context, Object, Result};
-use either::Either;
-use hub_core::uuid::Uuid;
-use std::collections::HashSet;
 
 #[derive(Debug, Clone, Default)]
 pub struct Query;
@@ -58,20 +60,18 @@ impl Query {
 
         let time_dimension = process_date_range(&resource, date_range)?;
 
-        /*
         let filter = Filter::new()
             .member(&format!("{resource}.{dimension}"))
             .operator("equals")
             .values(vec![id]);
-            */
 
         let query = CubeQuery::new()
             .limit(limit.unwrap_or(100))
             .order(&format!("{resource}.timestamp"), &order)
             .measures(measures)
             .dimensions(dimensions)
-            .time_dimensions(time_dimension);
-        //.filter_member(filter);
+            .time_dimensions(time_dimension)
+            .filter_member(filter);
 
         hub_core::tracing::info!("Query: {query:#?}");
 
