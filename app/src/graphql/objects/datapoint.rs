@@ -283,8 +283,8 @@ impl DataPoints {
     /// This function returns an error if there was a problem with retrieving the data points.
     pub fn from_response(
         response: &str,
-        resource: &str,
-    ) -> Result<Vec<DataPoint>, async_graphql::Error> {
+        resources: &[String],
+    ) -> Result<DataPoints, async_graphql::Error> {
         let response: V1LoadResponse =
             serde_json::from_str(response).map_err(|e| async_graphql::Error::new(e.to_string()))?;
 
@@ -296,17 +296,32 @@ impl DataPoints {
             .data
             .clone();
 
-        data.into_iter()
+        let result: Vec<DataPoint> = data
+            .into_iter()
             .map(|v| {
-                Ok(DataPoint {
-                    mints: Self::parse_data(&v, resource),
-                    customers: Self::parse_data(&v, resource),
-                    wallets: Self::parse_data(&v, resource),
-                    collections: Self::parse_data(&v, resource),
-                    projects: Self::parse_data(&v, resource),
-                })
+                let mut data_point = DataPoint {
+                    mints: None,
+                    customers: None,
+                    wallets: None,
+                    collections: None,
+                    projects: None,
+                };
+                for resource in resources.clone() {
+                    let parsed_data = Self::parse_data(&v, resource);
+                    match resource.as_str() {
+                        "mints" => data_point.mints = parsed_data,
+                        "customers" => data_point.customers = parsed_data,
+                        "wallets" => data_point.wallets = parsed_data,
+                        "collections" => data_point.collections = parsed_data,
+                        "projects" => data_point.projects = parsed_data,
+                        _ => {},
+                    }
+                }
+                data_point
             })
-            .collect()
+            .collect();
+
+        Ok(DataPoints(result))
     }
 
     fn parse_data(value: &Value, resource: &str) -> Option<Data> {

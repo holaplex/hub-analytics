@@ -1,6 +1,9 @@
 use sea_orm_migration::prelude::*;
 
-use crate::m20230804_212530_create_projects_table::Projects;
+use crate::{
+    m20230804_212530_create_projects_table::Projects,
+    m20230804_212603_create_customers_table::Customers,
+};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -20,6 +23,15 @@ impl MigrationTrait for Migration {
                             .name("fk-wallets_project_id-projects")
                             .from(Wallets::Table, Wallets::ProjectId)
                             .to(Projects::Table, Projects::Id)
+                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Cascade),
+                    )
+                    .col(ColumnDef::new(Wallets::CustomerId).uuid().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-wallets_customer_id-customers")
+                            .from(Wallets::Table, Wallets::CustomerId)
+                            .to(Customers::Table, Customers::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),
                     )
@@ -52,6 +64,7 @@ impl MigrationTrait for Migration {
 pub enum Wallets {
     Table,
     Id,
+    CustomerId,
     ProjectId,
     Blockchain,
     Timestamp,
