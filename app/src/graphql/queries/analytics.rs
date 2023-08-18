@@ -7,9 +7,8 @@ use hub_core::{chrono::NaiveDateTime, uuid::Uuid};
 use crate::{
     cube_client::{Client, Query as CubeQuery},
     graphql::objects::{
-        DataPoint, DataPoints, Granularity, Interval, Measure, Operation, Order, Resource,
-        TimeGranularity, V1LoadRequestQueryFilterItem as Filter,
-        V1LoadRequestQueryTimeDimension as TimeDimension,
+        DataPoint, DataPoints, Interval, Measure, Operation, Order, Resource, TimeGranularity,
+        V1LoadRequestQueryFilterItem as Filter, V1LoadRequestQueryTimeDimension as TimeDimension,
     },
 };
 
@@ -46,25 +45,27 @@ impl Query {
         limit: Option<i32>,
     ) -> Result<Vec<DataPoint>> {
         let cube = ctx.data::<Client>()?;
+        let mut datapoints = Vec::new();
 
         let selections = Selection::from_context(ctx);
 
         let (id, root) = parse_id_and_root(organization_id, project_id, collection_id)?;
 
         let order = order.unwrap_or(Order::Desc);
-        let mut datapoints = Vec::new();
+
+        let granularity = ctx
+            .field()
+            .selection_set()
+            .find(|selection| selection.name() == "timestamp")
+            .map(|_| interval.unwrap_or_default().to_granularity())
+            .map(|granularity| TimeGranularity::from(granularity).to_string());
+
         for selection in &selections {
             let resource = selection.resource.to_string();
+            let mut td = TimeDimension::new(format!("{resource}.timestamp"));
+            td.date_range(Either::Left(interval.unwrap_or_default().to_string()));
 
-            let mut time_dimension = TimeDimension::new(format!("{resource}.timestamp"));
-            let granularity = match interval {
-                Some(interval) => TimeGranularity::from(interval.to_granularity()),
-                None => TimeGranularity::from(Granularity::Day),
-            };
-
-            time_dimension
-                .granularity(&granularity.to_string())
-                .date_range(Either::Left(interval.unwrap_or_default().to_string()));
+            td.granularity = granularity.clone();
 
             let filter = Filter::new()
                 .member(&format!("{resource}.{root}"))
@@ -76,7 +77,7 @@ impl Query {
                 .order(&format!("{resource}.timestamp"), &order.to_string())
                 .measures(selection.measures.iter().map(Measure::as_string).collect())
                 .dimensions(selection.dimensions.clone())
-                .time_dimensions(time_dimension.clone())
+                .time_dimensions(Some(td.clone()))
                 .filter_member(filter);
 
             hub_core::tracing::info!("Query: {query:#?}");
@@ -86,21 +87,30 @@ impl Query {
                     .into_vec(),
             );
         }
-        let mut merged: BTreeMap<NaiveDateTime, DataPoint> = BTreeMap::new();
-        for dp in &datapoints {
-            if let Some(timestamp) = dp.timestamp {
-                merged
-                    .entry(timestamp)
-                    .and_modify(|existing_dp: &mut DataPoint| existing_dp.merge(dp))
-                    .or_insert_with(|| dp.clone());
-            }
-        }
 
-        let mut response: Vec<DataPoint> = merged.into_values().collect();
-
-        if matches!(order, Order::Desc) {
-            response.reverse();
-        }
+        let response = granularity.map_or_else(
+            || {
+                let mut merged = DataPoint::new();
+                datapoints.iter().for_each(|dp| merged.merge(dp));
+                vec![merged]
+            },
+            |_| {
+                let mut merged: BTreeMap<NaiveDateTime, DataPoint> = BTreeMap::new();
+                datapoints.iter().for_each(|dp| {
+                    if let Some(timestamp) = dp.timestamp {
+                        merged
+                            .entry(timestamp)
+                            .and_modify(|existing_dp: &mut DataPoint| existing_dp.merge(dp))
+                            .or_insert_with(|| dp.clone());
+                    }
+                });
+                let mut datapoints: Vec<DataPoint> = merged.into_values().collect();
+                if matches!(order, Order::Desc) {
+                    datapoints.reverse();
+                }
+                datapoints
+            },
+        );
 
         Ok(response)
     }

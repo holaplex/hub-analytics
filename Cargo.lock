@@ -742,8 +742,8 @@ dependencies = [
 
 [[package]]
 name = "cube-client"
-version = "0.1.1"
-source = "git+https://github.com/holaplex/cube-client?branch=dev#0912e78b6ce205ef3838db7a34cdee3d279f318e"
+version = "0.1.2"
+source = "git+https://github.com/holaplex/cube-client?branch=dev#45e5debd92b97f56e9627d5c2b3b0a24cd752645"
 dependencies = [
  "anyhow",
  "async-trait",

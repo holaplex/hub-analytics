@@ -36,9 +36,9 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 IndexCreateStatement::new()
-                    .name("transfers_collection_id_idx")
+                    .name("transfers_project_id_idx")
                     .table(Transfers::Table)
-                    .col(Transfers::CollectionId)
+                    .col(Transfers::ProjectId)
                     .index_type(IndexType::Hash)
                     .if_not_exists()
                     .to_owned(),
@@ -57,7 +57,6 @@ impl MigrationTrait for Migration {
 enum Transfers {
     Table,
     Id,
-    CollectionId,
     ProjectId,
     Timestamp,
 }
