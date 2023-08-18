@@ -2,7 +2,7 @@ use async_graphql::{ComplexObject, Context, Result, SimpleObject};
 use hub_core::uuid::Uuid;
 
 use crate::graphql::{
-    objects::{DataPoint, DateRange, Order},
+    objects::{DataPoint, Interval, Order},
     queries::analytics::Query,
 };
 
@@ -18,7 +18,7 @@ impl Organization {
     async fn analytics(
         &self,
         ctx: &Context<'_>,
-        date_range: Option<DateRange>,
+        interval: Option<Interval>,
         order: Option<Order>,
         limit: Option<i32>,
     ) -> Result<Vec<DataPoint>> {
@@ -28,7 +28,7 @@ impl Organization {
             Some(self.id),
             None,
             None,
-            date_range,
+            interval,
             order,
             limit,
         )

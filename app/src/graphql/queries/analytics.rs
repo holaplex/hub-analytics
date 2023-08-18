@@ -1,13 +1,13 @@
-use std::collections::HashSet;
+use std::collections::BTreeMap;
 
 use async_graphql::{Context, Object, Result};
 use either::Either;
-use hub_core::uuid::Uuid;
+use hub_core::{chrono::NaiveDateTime, uuid::Uuid};
 
 use crate::{
     cube_client::{Client, Query as CubeQuery},
     graphql::objects::{
-        DataPoint, DataPoints, DateRange, Granularity, Measure, Operation, Order, Resource,
+        DataPoint, DataPoints, Granularity, Interval, Measure, Operation, Order, Resource,
         TimeGranularity, V1LoadRequestQueryFilterItem as Filter,
         V1LoadRequestQueryTimeDimension as TimeDimension,
     },
@@ -25,7 +25,7 @@ impl Query {
     /// * `projectId` - The ID of the project.
     /// * `collectionId` - The ID of the collection.
     /// * `measures` - An map array of resources to query (resource, operation).
-    /// * `dateRange` - DateFrom and DateTo, in YYYY-MM-DD format.
+    /// * `interval` - The timeframe interval. `TODAY` | `YESTERDAY` | `THIS_MONTH` | `LAST_MONTH`
     /// * `order` - order the results by ASC or DESC.
     /// * `limit` - Optional limit on the number of data points to retrieve.
     ///
@@ -41,71 +41,105 @@ impl Query {
         organization_id: Option<Uuid>,
         project_id: Option<Uuid>,
         collection_id: Option<Uuid>,
-        date_range: Option<DateRange>,
+        interval: Option<Interval>,
         order: Option<Order>,
         limit: Option<i32>,
     ) -> Result<Vec<DataPoint>> {
         let cube = ctx.data::<Client>()?;
 
-        let (resources, dimensions, measures) = parse_dimensions_and_measures(ctx);
+        let selections = Selection::from_context(ctx);
 
-        let resource = measures.first().map_or_else(
-            || "mints".to_string(),
-            |measure| measure.resource.to_string(),
-        );
-        hub_core::tracing::info!("Dimensions: {dimensions:#?}, Resource: {resource:#?}",);
-        let measures = measures.iter().map(Measure::as_string).collect();
-        let order = order.unwrap_or(Order::Desc).to_string();
-        let (id, dimension) = get_id_and_dimension(organization_id, project_id, collection_id)?;
+        let (id, root) = parse_id_and_root(organization_id, project_id, collection_id)?;
 
-        let time_dimension = process_date_range(&resource, date_range)?;
+        let order = order.unwrap_or(Order::Desc);
+        let mut datapoints = Vec::new();
+        for selection in &selections {
+            let resource = selection.resource.to_string();
 
-        let filter = Filter::new()
-            .member(&format!("{resource}.{dimension}"))
-            .operator("equals")
-            .values(vec![id]);
+            let mut time_dimension = TimeDimension::new(format!("{resource}.timestamp"));
+            let granularity = match interval {
+                Some(interval) => TimeGranularity::from(interval.to_granularity()),
+                None => TimeGranularity::from(Granularity::Day),
+            };
 
-        let query = CubeQuery::new()
-            .limit(limit.unwrap_or(100))
-            .order(&format!("{resource}.timestamp"), &order)
-            .measures(measures)
-            .dimensions(dimensions)
-            .time_dimensions(time_dimension)
-            .filter_member(filter);
+            time_dimension
+                .granularity(&granularity.to_string())
+                .date_range(Either::Left(interval.unwrap_or_default().to_string()));
 
-        hub_core::tracing::info!("Query: {query:#?}");
+            let filter = Filter::new()
+                .member(&format!("{resource}.{root}"))
+                .operator("equals")
+                .values(vec![id.clone()]);
 
-        Ok(DataPoints::from_response(&cube.query(query).await?, &resources)?.into_vec())
-    }
-}
+            let query = CubeQuery::new()
+                .limit(limit.unwrap_or(100))
+                .order(&format!("{resource}.timestamp"), &order.to_string())
+                .measures(selection.measures.iter().map(Measure::as_string).collect())
+                .dimensions(selection.dimensions.clone())
+                .time_dimensions(time_dimension.clone())
+                .filter_member(filter);
 
-#[must_use]
-pub fn parse_dimensions_and_measures(
-    ctx: &Context<'_>,
-) -> (Vec<String>, Vec<String>, Vec<Measure>) {
-    let mut dimensions = Vec::new();
-    let mut measures = Vec::new();
-    let mut resources = HashSet::new(); // Use a HashSet to ensure uniqueness
+            hub_core::tracing::info!("Query: {query:#?}");
 
-    for field in ctx.field().selection_set() {
-        if let Ok(resource) = field.name().parse::<Resource>() {
-            resources.insert(resource.to_string());
-            for nested_field in field.selection_set() {
-                match nested_field.name() {
-                    "count" => measures.push(Measure::new(resource, Operation::Count)),
-                    "organizationId" => dimensions.push("projects.organization_id".to_string()),
-                    "projectId" => dimensions.push(format!("{resource}.project_id")),
-                    "collectionId" => dimensions.push(format!("{resource}.collection_id")),
-                    _ => {},
-                }
+            datapoints.extend(
+                DataPoints::from_response(&cube.query(query).await?, selection.resource)?
+                    .into_vec(),
+            );
+        }
+        let mut merged: BTreeMap<NaiveDateTime, DataPoint> = BTreeMap::new();
+        for dp in &datapoints {
+            if let Some(timestamp) = dp.timestamp {
+                merged
+                    .entry(timestamp)
+                    .and_modify(|existing_dp: &mut DataPoint| existing_dp.merge(dp))
+                    .or_insert_with(|| dp.clone());
             }
         }
-    }
 
-    (resources.into_iter().collect(), dimensions, measures)
+        Ok(merged.into_values().collect())
+    }
 }
 
-fn get_id_and_dimension(
+pub struct Selection {
+    pub resource: Resource,
+    pub measures: Vec<Measure>,
+    pub dimensions: Vec<String>,
+}
+
+impl Selection {
+    #[must_use]
+    pub fn from_context(ctx: &Context<'_>) -> Vec<Selection> {
+        let mut selections: Vec<Selection> = Vec::new();
+
+        for field in ctx.field().selection_set() {
+            if let Ok(resource) = field.name().parse::<Resource>() {
+                let mut dimensions = Vec::new();
+                let mut measures = Vec::new();
+                for nested_field in field.selection_set() {
+                    match nested_field.name() {
+                        "count" => measures.push(Measure::new(resource, Operation::Count)),
+                        "organizationId" => dimensions.push("projects.organization_id".to_string()),
+                        "projectId" => dimensions.push(format!("{resource}.project_id")),
+                        "collectionId" => dimensions.push(format!("{resource}.collection_id")),
+                        _ => {},
+                    }
+                }
+
+                let selection = Selection {
+                    resource,
+                    measures,
+                    dimensions,
+                };
+
+                selections.push(selection);
+            }
+        }
+
+        selections
+    }
+}
+
+fn parse_id_and_root(
     organization_id: Option<Uuid>,
     project_id: Option<Uuid>,
     collection_id: Option<Uuid>,
@@ -118,36 +152,4 @@ fn get_id_and_dimension(
             "No valid [project,organization,collection] ID or multiple IDs provided",
         )),
     }
-}
-
-fn process_date_range(
-    resource: &str,
-    range: Option<DateRange>,
-) -> Result<TimeDimension, async_graphql::Error> {
-    let mut td = TimeDimension::new(format!("{resource}.timestamp"));
-
-    if let Some(range) = range {
-        let granularity = match range.interval {
-            Some(interval) => TimeGranularity::from(interval.to_granularity()),
-            None => TimeGranularity::from(Granularity::Day),
-        };
-
-        td.granularity(&granularity.to_string());
-
-        // Determine date range
-        let dr = match (range.start, range.end) {
-            (Some(start), Some(end)) => Either::Right(vec![start.to_string(), end.to_string()]),
-            (None, None) if range.interval.is_some() => {
-                Either::Left(range.interval.unwrap().to_string())
-            },
-            _ => {
-                return Err(async_graphql::Error::new(
-                    "Invalid DateRange provided. If start is defined, end must be defined too, and vice versa. If neither are defined, interval must be provided.",
-                ));
-            },
-        };
-        td.date_range(dr);
-    }
-
-    Ok(td)
 }

@@ -1,42 +1,132 @@
 use std::{fmt, str::FromStr};
 
-use async_graphql::{Enum, InputObject, SimpleObject};
+use async_graphql::{Enum, Error, InputObject, SimpleObject};
 pub use cube_client::models::{v1_time::TimeGranularity, V1LoadResponse};
 use hub_core::{
     anyhow::Result,
     chrono::{NaiveDate, NaiveDateTime},
     uuid::Uuid,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// A `DataPoint` object containing analytics information.
-#[derive(Debug, Clone, Deserialize, SimpleObject)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, SimpleObject)]
 pub struct DataPoint {
     /// Analytics data for mints.
-    pub mints: Option<Data>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mints: Option<Vec<Data>>,
     /// Analytics data for customers.
-    pub customers: Option<Data>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub customers: Option<Vec<Data>>,
     /// Analytics data for collections.
-    pub collections: Option<Data>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub collections: Option<Vec<Data>>,
     /// Analytics data for wallets.
-    pub wallets: Option<Data>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallets: Option<Vec<Data>>,
     /// Analytics data for projects.
-    pub projects: Option<Data>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub projects: Option<Vec<Data>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub webhooks: Option<Vec<Data>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credits: Option<Vec<Data>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfers: Option<Vec<Data>>,
+    /// The timestamp associated with the data point.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<NaiveDateTime>,
 }
 
-#[derive(Debug, Clone, Deserialize, SimpleObject)]
+macro_rules! merge_fields {
+    ($self:expr, $other:expr, $($field:ident),+) => {
+        $(
+            if let Some(ref mut dest) = $self.$field {
+                if let Some(src) = &$other.$field {
+                    dest.extend_from_slice(src);
+                }
+            } else {
+                $self.$field = $other.$field.clone();
+            }
+        )+
+    };
+}
+
+macro_rules! set_field {
+    ($self:expr, $resource:expr, $data:expr, $(($enum_variant:ident, $field:ident)),+ ) => {
+        match $resource {
+            $(
+                Resource::$enum_variant => {
+                    $self.$field.get_or_insert_with(Vec::new).push($data.clone());
+                }
+            ),+
+        }
+    };
+}
+
+impl DataPoint {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            mints: None,
+            customers: None,
+            collections: None,
+            wallets: None,
+            projects: None,
+            transfers: None,
+            webhooks: None,
+            credits: None,
+            timestamp: None,
+        }
+    }
+
+    pub fn set(&mut self, resource: Resource, data: &Data, timestamp: Option<NaiveDateTime>) {
+        self.timestamp = timestamp;
+        set_field!(
+            self,
+            resource,
+            data,
+            (Mints, mints),
+            (Customers, customers),
+            (Wallets, wallets),
+            (Collections, collections),
+            (Projects, projects),
+            (Transfers, transfers),
+            (Webhooks, webhooks),
+            (Credits, credits)
+        );
+    }
+    pub fn merge(&mut self, other: &DataPoint) {
+        merge_fields!(
+            self,
+            other,
+            mints,
+            customers,
+            wallets,
+            collections,
+            projects,
+            transfers,
+            webhooks,
+            credits
+        );
+    }
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, SimpleObject)]
 pub struct Data {
     /// Count for the metric.
-    pub count: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub count: Option<u64>,
     /// The ID of the organization the data belongs to.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub organization_id: Option<Uuid>,
     /// The ID of the collection the data belongs to.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub collection_id: Option<Uuid>,
     /// The ID of the project the data belongs to.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub project_id: Option<Uuid>,
-    /// The timestamp associated with the data point.
-    pub timestamp: Option<NaiveDateTime>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
@@ -94,13 +184,17 @@ impl fmt::Display for Operation {
         write!(f, "{s}")
     }
 }
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+
+#[derive(Debug, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum Resource {
     Mints,
     Customers,
     Wallets,
     Collections,
     Projects,
+    Transfers,
+    Webhooks,
+    Credits,
 }
 
 impl fmt::Display for Resource {
@@ -111,6 +205,9 @@ impl fmt::Display for Resource {
             Resource::Wallets => "wallets",
             Resource::Collections => "collections",
             Resource::Projects => "projects",
+            Resource::Transfers => "transfers",
+            Resource::Webhooks => "webhooks",
+            Resource::Credits => "credits",
         };
         write!(f, "{s}")
     }
@@ -126,6 +223,9 @@ impl FromStr for Resource {
             "wallets" => Ok(Resource::Wallets),
             "collections" => Ok(Resource::Collections),
             "projects" => Ok(Resource::Projects),
+            "transfers" => Ok(Resource::Transfers),
+            "webhooks" => Ok(Resource::Webhooks),
+            "credits" => Ok(Resource::Credits),
             _ => Err(()),
         }
     }
@@ -172,9 +272,10 @@ pub struct DateRange {
     pub interval: Option<Interval>,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum Interval {
     All,
+    #[default]
     Today,
     Yesterday,
     ThisWeek,
@@ -269,7 +370,7 @@ impl DataPoints {
     }
 
     /// Helper function to get a field and parse it as `NaiveDateTime`.
-    fn parse_datetime(value: &Value, field: &str) -> Option<NaiveDateTime> {
+    fn parse_timestamp(value: &Value, field: &str) -> Option<NaiveDateTime> {
         value
             .get(field)
             .and_then(Value::as_str)
@@ -281,56 +382,38 @@ impl DataPoints {
     ///
     /// # Errors
     /// This function returns an error if there was a problem with retrieving the data points.
-    pub fn from_response(
-        response: &str,
-        resources: &[String],
-    ) -> Result<DataPoints, async_graphql::Error> {
+    pub fn from_response(response: &str, resource: Resource) -> Result<DataPoints, Error> {
         let response: V1LoadResponse =
-            serde_json::from_str(response).map_err(|e| async_graphql::Error::new(e.to_string()))?;
+            serde_json::from_str(response).map_err(|e| Error::new(e.to_string()))?;
 
         hub_core::tracing::info!("Res: {:#?}", response);
-        let data: Vec<Value> = response
+        let data = response
             .results
             .first()
-            .ok_or_else(|| async_graphql::Error::new("No results found"))?
+            .ok_or_else(|| Error::new("No results found"))?
             .data
-            .clone();
-
-        let result: Vec<DataPoint> = data
-            .into_iter()
+            .iter()
             .map(|v| {
-                let mut data_point = DataPoint {
-                    mints: None,
-                    customers: None,
-                    wallets: None,
-                    collections: None,
-                    projects: None,
-                };
-                for resource in resources.clone() {
-                    let parsed_data = Self::parse_data(&v, resource);
-                    match resource.as_str() {
-                        "mints" => data_point.mints = parsed_data,
-                        "customers" => data_point.customers = parsed_data,
-                        "wallets" => data_point.wallets = parsed_data,
-                        "collections" => data_point.collections = parsed_data,
-                        "projects" => data_point.projects = parsed_data,
-                        _ => {},
-                    }
-                }
+                let mut data_point = DataPoint::new();
+                let data = Self::parse_data(v, &resource.to_string());
+                data_point.set(
+                    resource,
+                    &data,
+                    Self::parse_timestamp(v, &format!("{resource}.timestamp")),
+                );
                 data_point
             })
             .collect();
 
-        Ok(DataPoints(result))
+        Ok(DataPoints(data))
     }
 
-    fn parse_data(value: &Value, resource: &str) -> Option<Data> {
-        Some(Data {
-            count: Self::parse_count(value, resource)?,
+    fn parse_data(value: &Value, resource: &str) -> Data {
+        Data {
+            count: Self::parse_count(value, resource),
             organization_id: Self::parse_uuid(value, "projects.organization_id"),
             project_id: Self::parse_uuid(value, &format!("{resource}.project_id")),
             collection_id: Self::parse_uuid(value, "mints.collection_id"),
-            timestamp: Self::parse_datetime(value, &format!("{resource}.timestamp")),
-        })
+        }
     }
 }
