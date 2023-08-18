@@ -24,6 +24,7 @@ impl MigrationTrait for Migration {
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),
                     )
+                    .col(ColumnDef::new(Projects::Timestamp).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
@@ -53,4 +54,5 @@ pub enum Projects {
     Id,
     Name,
     OrganizationId,
+    Timestamp,
 }
