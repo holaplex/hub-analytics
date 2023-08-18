@@ -96,7 +96,13 @@ impl Query {
             }
         }
 
-        Ok(merged.into_values().collect())
+        let mut response: Vec<DataPoint> = merged.into_values().collect();
+
+        if matches!(order, Order::Desc) {
+            response.reverse();
+        }
+
+        Ok(response)
     }
 }
 
