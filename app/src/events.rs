@@ -66,7 +66,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
             },
             Some(_) | None => Ok(()),
         },
-        Services::Webhooks(_, _) => Ok(()), //TODO
+        Services::Webhooks(..) => Ok(()), //TODO
         Services::Nfts(k, v) => match v.event {
             Some(nft_events::Event::SolanaCreateDrop(v)) => {
                 collections::ActiveModel {
