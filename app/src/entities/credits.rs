@@ -3,12 +3,11 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "projects")]
+#[sea_orm(table_name = "credits")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
-    #[sea_orm(column_type = "Text")]
-    pub name: String,
+    pub amount: u64,
     pub organization_id: Uuid,
     pub timestamp: DateTime,
 }

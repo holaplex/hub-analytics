@@ -29,6 +29,7 @@ pub enum Services {
     Organizations(proto::OrganizationEventKey, proto::OrganizationEvents),
     Customers(proto::CustomerEventKey, proto::CustomerEvents),
     Treasuries(proto::TreasuryEventKey, proto::TreasuryEvents),
+    Webhooks(proto::WebhookEventKey, proto::WebhookEvents),
     Nfts(proto::NftEventKey, proto::NftEvents),
     SolanaNfts(proto::SolanaNftEventKey, proto::SolanaNftEvents),
 }
@@ -38,6 +39,8 @@ impl hub_core::consumer::MessageGroup for Services {
         "hub-orgs",
         "hub-customers",
         "hub-treasuries",
+        "hub-webhooks",
+        "hub-credits",
         "hub-nfts",
         "hub-nfts-solana",
         "hub-nfts-polygon",
@@ -68,6 +71,8 @@ impl hub_core::consumer::MessageGroup for Services {
 
                 Ok(Services::Treasuries(key, val))
             },
+            "hub-webhooks" => todo!(),
+            "hub-credits" => todo!(),
             "hub-nfts" => {
                 let key = proto::NftEventKey::decode(key)?;
                 let val = proto::NftEvents::decode(val)?;

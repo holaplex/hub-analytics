@@ -1,9 +1,6 @@
 use sea_orm_migration::prelude::*;
 
-use crate::{
-    m20230804_212530_create_projects_table::Projects,
-    m20230804_213809_create_collections_table::Collections,
-};
+use crate::m20230804_212530_create_projects_table::Projects;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -21,15 +18,6 @@ impl MigrationTrait for Migration {
                             .uuid()
                             .not_null()
                             .primary_key(),
-                    )
-                    .col(ColumnDef::new(Transfers::CollectionId).uuid().not_null())
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("fk-transfers_collection_id-collections")
-                            .from(Transfers::Table, Transfers::CollectionId)
-                            .to(Collections::Table, Collections::Id)
-                            .on_delete(ForeignKeyAction::Cascade)
-                            .on_update(ForeignKeyAction::Cascade),
                     )
                     .col(ColumnDef::new(Transfers::ProjectId).uuid().not_null())
                     .foreign_key(
