@@ -96,14 +96,15 @@ impl Query {
             },
             |_| {
                 let mut merged: BTreeMap<NaiveDateTime, DataPoint> = BTreeMap::new();
-                datapoints.iter().for_each(|dp| {
+
+                for dp in &datapoints {
                     if let Some(timestamp) = dp.timestamp {
                         merged
                             .entry(timestamp)
                             .and_modify(|existing_dp: &mut DataPoint| existing_dp.merge(dp))
                             .or_insert_with(|| dp.clone());
                     }
-                });
+                }
                 let mut datapoints: Vec<DataPoint> = merged.into_values().collect();
                 if matches!(order, Order::Desc) {
                     datapoints.reverse();
