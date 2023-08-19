@@ -11,20 +11,20 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Projects::Table)
+                    .table(Credits::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(Projects::Id).uuid().not_null().primary_key())
-                    .col(ColumnDef::new(Projects::Name).string().not_null())
-                    .col(ColumnDef::new(Projects::OrganizationId).uuid().not_null())
+                    .col(ColumnDef::new(Credits::Id).uuid().not_null().primary_key())
+                    .col(ColumnDef::new(Credits::OrganizationId).uuid().not_null())
+                    .col(ColumnDef::new(Credits::Amount).big_integer().not_null())
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk-projects_organization_id-organizations")
-                            .from(Projects::Table, Projects::OrganizationId)
+                            .name("fk-credits_organization_id-organizations")
+                            .from(Credits::Table, Credits::OrganizationId)
                             .to(Organizations::Table, Organizations::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),
                     )
-                    .col(ColumnDef::new(Projects::Timestamp).timestamp().not_null())
+                    .col(ColumnDef::new(Credits::Timestamp).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
@@ -32,9 +32,9 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 IndexCreateStatement::new()
-                    .name("projects_organization_id_idx")
-                    .table(Projects::Table)
-                    .col(Projects::OrganizationId)
+                    .name("credits_organization_id_idx")
+                    .table(Credits::Table)
+                    .col(Credits::OrganizationId)
                     .index_type(IndexType::Hash)
                     .to_owned(),
             )
@@ -43,16 +43,16 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Projects::Table).to_owned())
+            .drop_table(Table::drop().table(Credits::Table).to_owned())
             .await
     }
 }
 
 #[derive(Iden)]
-pub enum Projects {
+pub enum Credits {
     Table,
     Id,
-    Name,
+    Amount,
     OrganizationId,
     Timestamp,
 }

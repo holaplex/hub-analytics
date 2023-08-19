@@ -3,7 +3,7 @@ use sea_orm::{prelude::*, Set};
 
 use crate::{
     db::Connection,
-    entities::{collections, customers, mints, organizations, projects, wallets},
+    entities::{collections, customers, mints, organizations, projects, transfers, wallets},
     proto::{customer_events, nft_events, organization_events, solana_nft_events, treasury_events},
     Services,
 };
@@ -30,6 +30,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                     id: Set(Uuid::parse_str(&k.id)?),
                     name: Set(v.name),
                     organization_id: Set(Uuid::parse_str(&v.organization_id)?),
+                    timestamp: Set(Utc::now().naive_utc()),
                 }
                 .insert(db.get())
                 .await?;
@@ -65,6 +66,7 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
             },
             Some(_) | None => Ok(()),
         },
+        Services::Webhooks(..) => Ok(()), //TODO
         Services::Nfts(k, v) => match v.event {
             Some(nft_events::Event::SolanaCreateDrop(v)) => {
                 collections::ActiveModel {
@@ -94,7 +96,6 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                 mints::ActiveModel {
                     id: Set(Uuid::parse_str(&k.id)?),
                     collection_id: Set(Uuid::parse_str(&v.collection_id)?),
-                    owner: Set(v.recipient_address),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
                     timestamp: Set(Utc::now().naive_utc()),
                 }
@@ -106,7 +107,16 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
                 mints::ActiveModel {
                     id: Set(Uuid::parse_str(&k.id)?),
                     collection_id: Set(Uuid::parse_str(&v.collection_id)?),
-                    owner: Set(v.receiver),
+                    project_id: Set(Uuid::parse_str(&k.project_id)?),
+                    timestamp: Set(Utc::now().naive_utc()),
+                }
+                .insert(db.get())
+                .await?;
+                Ok(())
+            },
+            Some(nft_events::Event::TransferMint(_)) => {
+                transfers::ActiveModel {
+                    id: Set(Uuid::parse_str(&k.id)?),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
                     timestamp: Set(Utc::now().naive_utc()),
                 }
@@ -132,7 +142,6 @@ pub async fn process(msg: Services, db: Connection) -> Result<()> {
             Some(solana_nft_events::Event::ImportedExternalMint(v)) => {
                 mints::ActiveModel {
                     id: Set(Uuid::parse_str(&k.id)?),
-                    owner: Set(v.owner),
                     collection_id: Set(Uuid::parse_str(&v.collection_id)?),
                     project_id: Set(Uuid::parse_str(&k.project_id)?),
                     timestamp: Set(Utc::now().naive_utc()),

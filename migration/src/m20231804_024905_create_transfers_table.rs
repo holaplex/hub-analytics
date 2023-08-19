@@ -11,29 +11,24 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Collections::Table)
+                    .table(Transfers::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(Collections::Id)
+                        ColumnDef::new(Transfers::Id)
                             .uuid()
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Collections::ProjectId).uuid().not_null())
+                    .col(ColumnDef::new(Transfers::ProjectId).uuid().not_null())
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk-collections_project_id-projects")
-                            .from(Collections::Table, Collections::ProjectId)
+                            .name("fk-transfers_project_id-projects")
+                            .from(Transfers::Table, Transfers::ProjectId)
                             .to(Projects::Table, Projects::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),
                     )
-                    .col(ColumnDef::new(Collections::Blockchain).string().not_null())
-                    .col(
-                        ColumnDef::new(Collections::Timestamp)
-                            .timestamp()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Transfers::Timestamp).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
@@ -41,10 +36,11 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 IndexCreateStatement::new()
-                    .name("collections_project_id_idx")
-                    .table(Collections::Table)
-                    .col(Collections::ProjectId)
+                    .name("transfers_project_id_idx")
+                    .table(Transfers::Table)
+                    .col(Transfers::ProjectId)
                     .index_type(IndexType::Hash)
+                    .if_not_exists()
                     .to_owned(),
             )
             .await
@@ -52,16 +48,15 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Collections::Table).to_owned())
+            .drop_table(Table::drop().table(Transfers::Table).to_owned())
             .await
     }
 }
 
 #[derive(Iden)]
-pub enum Collections {
+enum Transfers {
     Table,
     Id,
-    Blockchain,
     ProjectId,
     Timestamp,
 }

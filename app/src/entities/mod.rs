@@ -3,8 +3,11 @@
 pub mod prelude;
 
 pub mod collections;
+pub mod credits;
 pub mod customers;
 pub mod mints;
 pub mod organizations;
 pub mod projects;
+pub mod transfers;
 pub mod wallets;
+pub mod webhooks;
