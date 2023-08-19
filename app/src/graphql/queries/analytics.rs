@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 
 use async_graphql::{Context, Object, Result};
 use either::Either;
-use hub_core::{chrono::NaiveDateTime, uuid::Uuid};
+use hub_core::{
+    chrono::{NaiveDate, NaiveDateTime},
+    uuid::Uuid,
+};
 
 use crate::{
     cube_client::{Client, Query as CubeQuery},
@@ -52,20 +55,18 @@ impl Query {
         let (id, root) = parse_id_and_root(organization_id, project_id, collection_id)?;
 
         let order = order.unwrap_or(Order::Desc);
-
-        let granularity = ctx
-            .field()
-            .selection_set()
-            .find(|selection| selection.name() == "timestamp")
-            .map(|_| interval.unwrap_or_default().to_granularity())
-            .map(|granularity| TimeGranularity::from(granularity).to_string());
-
+        let mut use_ts = false;
         for selection in &selections {
             let resource = selection.resource.to_string();
-            let mut td = TimeDimension::new(format!("{resource}.timestamp"));
+            let ts_dimension = format!("{resource}.timestamp");
+            let mut td = TimeDimension::new(ts_dimension.clone());
             td.date_range(Either::Left(interval.unwrap_or_default().to_string()));
 
-            td.granularity = granularity.clone();
+            if selection.has_ts {
+                use_ts = true;
+                td.granularity = Some(interval.unwrap_or_default().to_granularity())
+                    .map(|g| TimeGranularity::from(g).to_string());
+            }
 
             let filter = Filter::new()
                 .member(&format!("{resource}.{root}"))
@@ -74,7 +75,7 @@ impl Query {
 
             let query = CubeQuery::new()
                 .limit(limit.unwrap_or(100))
-                .order(&format!("{resource}.timestamp"), &order.to_string())
+                .order(&ts_dimension, &order.to_string())
                 .measures(selection.measures.iter().map(Measure::as_string).collect())
                 .dimensions(selection.dimensions.clone())
                 .time_dimensions(Some(td.clone()))
@@ -88,31 +89,40 @@ impl Query {
             );
         }
 
-        let response = granularity.map_or_else(
-            || {
-                let mut merged = DataPoint::new();
-                datapoints.iter().for_each(|dp| merged.merge(dp));
-                vec![merged]
-            },
-            |_| {
-                let mut merged: BTreeMap<NaiveDateTime, DataPoint> = BTreeMap::new();
+        let dummy_ts: NaiveDateTime = NaiveDate::from_ymd_opt(1900, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
 
-                for dp in &datapoints {
-                    if let Some(timestamp) = dp.timestamp {
-                        merged
-                            .entry(timestamp)
-                            .and_modify(|existing_dp: &mut DataPoint| existing_dp.merge(dp))
-                            .or_insert_with(|| dp.clone());
-                    }
-                }
-                let mut datapoints: Vec<DataPoint> = merged.into_values().collect();
-                if matches!(order, Order::Desc) {
-                    datapoints.reverse();
-                }
-                datapoints
-            },
-        );
+        let response = if use_ts {
+            let mut merged: BTreeMap<NaiveDateTime, DataPoint> = BTreeMap::new();
 
+            for dp in &datapoints {
+                let timestamp = dp.timestamp.unwrap_or(dummy_ts);
+                merged
+                    .entry(timestamp)
+                    .and_modify(|existing_dp| existing_dp.merge(dp))
+                    .or_insert_with(|| dp.clone());
+            }
+
+            let mut datapoints: Vec<DataPoint> = merged.into_values().collect();
+
+            for dp in &mut datapoints {
+                if dp.timestamp == Some(dummy_ts) {
+                    dp.timestamp = None;
+                }
+            }
+
+            if matches!(order, Order::Desc) {
+                datapoints.reverse();
+            }
+
+            datapoints
+        } else {
+            let mut merged = DataPoint::new();
+            datapoints.iter().for_each(|dp| merged.merge(dp));
+            vec![merged]
+        };
         Ok(response)
     }
 }
@@ -121,6 +131,7 @@ pub struct Selection {
     pub resource: Resource,
     pub measures: Vec<Measure>,
     pub dimensions: Vec<String>,
+    pub has_ts: bool,
 }
 
 impl Selection {
@@ -132,12 +143,14 @@ impl Selection {
             if let Ok(resource) = field.name().parse::<Resource>() {
                 let mut dimensions = Vec::new();
                 let mut measures = Vec::new();
+                let mut has_ts = false;
                 for nested_field in field.selection_set() {
                     match nested_field.name() {
                         "count" => measures.push(Measure::new(resource, Operation::Count)),
                         "organizationId" => dimensions.push("projects.organization_id".to_string()),
                         "projectId" => dimensions.push(format!("{resource}.project_id")),
                         "collectionId" => dimensions.push(format!("{resource}.collection_id")),
+                        "timestamp" => has_ts = true,
                         _ => {},
                     }
                 }
@@ -146,6 +159,7 @@ impl Selection {
                     resource,
                     measures,
                     dimensions,
+                    has_ts,
                 };
 
                 selections.push(selection);

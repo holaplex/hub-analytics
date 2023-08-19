@@ -34,8 +34,7 @@ pub struct DataPoint {
     pub credits: Option<Vec<Data>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transfers: Option<Vec<Data>>,
-    /// The timestamp associated with the data point.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[graphql(visible = false)]
     pub timestamp: Option<NaiveDateTime>,
 }
 
@@ -127,6 +126,9 @@ pub struct Data {
     /// The ID of the project the data belongs to.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_id: Option<Uuid>,
+    /// the timestamp associated with the data point.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<NaiveDateTime>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
@@ -414,6 +416,7 @@ impl DataPoints {
             organization_id: Self::parse_uuid(value, "projects.organization_id"),
             project_id: Self::parse_uuid(value, &format!("{resource}.project_id")),
             collection_id: Self::parse_uuid(value, "mints.collection_id"),
+            timestamp: Self::parse_timestamp(value, &format!("{resource}.timestamp")),
         }
     }
 }
