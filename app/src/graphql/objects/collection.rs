@@ -1,10 +1,7 @@
 use async_graphql::{ComplexObject, Context, Result, SimpleObject};
 use hub_core::uuid::Uuid;
 
-use crate::graphql::{
-    objects::{DataPoint, Interval, Order},
-    queries::analytics::Query,
-};
+use crate::graphql::objects::{Interval, Order};
 
 #[derive(Debug, Clone, SimpleObject)]
 #[graphql(complex)]
@@ -15,24 +12,13 @@ pub struct Collection {
 
 #[ComplexObject]
 impl Collection {
-    #[allow(clippy::too_many_arguments)]
     async fn analytics(
         &self,
-        ctx: &Context<'_>,
-        interval: Option<Interval>,
-        order: Option<Order>,
-        limit: Option<i32>,
-    ) -> Result<Vec<DataPoint>> {
-        Query::analytics(
-            &Query,
-            ctx,
-            None,
-            None,
-            Some(self.id),
-            interval,
-            order,
-            limit,
-        )
-        .await
+        _ctx: &Context<'_>,
+        _interval: Option<Interval>,
+        _order: Option<Order>,
+        _limit: Option<i32>,
+    ) -> Result<String> {
+        Ok(String::new())
     }
 }

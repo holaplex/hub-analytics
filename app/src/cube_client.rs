@@ -9,6 +9,7 @@ use hub_core::{
     clap, thiserror,
     url::Url,
 };
+use serde::de::DeserializeOwned;
 
 /// Arguments for establishing a database connection
 #[derive(Clone, Debug, clap::Args)]
@@ -49,13 +50,22 @@ impl Client {
     ///
     /// # Errors
     /// This function fails if query parameters are invalid or Cube is not responding
-    pub async fn query(&self, query: Query) -> Result<String, CubeClientError> {
+    pub async fn query<T: DeserializeOwned>(
+        &self,
+        query: Query,
+    ) -> Result<Vec<T>, CubeClientError> {
         let request = V1LoadRequest {
             query: Some(query.build()),
             query_type: Some("multi".to_string()),
         };
 
         let response = cube_api::load_v1(&self.0, Some(request)).await?;
-        Ok(serde_json::to_string(&response)?)
+
+        response.results[0]
+            .data
+            .iter()
+            .map(|value| serde_json::from_value(value.clone()))
+            .collect::<Result<Vec<T>, serde_json::Error>>()
+            .map_err(Into::into)
     }
 }

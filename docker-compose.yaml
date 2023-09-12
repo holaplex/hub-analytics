@@ -41,6 +41,7 @@ services:
       - CUBEJS_DB_HOST=db
       - CUBEJS_DB_USER=postgres
       - CUBEJS_DB_NAME=analytics
+      - CUBEJS_DB_PORT=5432
       - CUBEJS_DB_PASS=holaplex
 
     volumes:
