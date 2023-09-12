@@ -27,7 +27,8 @@ async-graphql = { version = "5.0.4", features = [
   "apollo_tracing",
 ] }
 async-graphql-poem = "5.0.3"
-serde = { version = "1.0.152", features = ["derive"] }
+serde = { version = "1.0.188", features = ["derive"] }
+serde_derive = { version = "1.0.188" }
 serde_json = { version = "1.0.91" }
 prost = "0.11.6"
 cube-client = { version = "0.1.2", git = "https://github.com/holaplex/cube-client", branch = "dev" }

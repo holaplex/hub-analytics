@@ -1,5 +1,5 @@
 mod collection;
-mod datapoint;
+mod data_point;
 mod organization;
 mod project;
 
@@ -7,8 +7,8 @@ pub use collection::Collection;
 pub use cube_client::models::{
     V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension, V1LoadResponse,
 };
-pub use datapoint::{
-    DataPoint, DataPoints, DateRange, Dimension, Granularity, Interval, Measure, Operation, Order,
+pub use data_point::{
+    CustomerDataPoint, DateRange, Granularity, Interval, Measure, MintDataPoint, Operation, Order,
     Resource, TimeGranularity,
 };
 pub use organization::Organization;
